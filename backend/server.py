@@ -89,6 +89,18 @@ class ChatRequest(BaseModel):
     message: str
     provider: Optional[str] = "openai"
     model: Optional[str] = "gpt-5.1"
+    image_data: Optional[str] = None  # base64 encoded image
+    audio_data: Optional[str] = None  # base64 encoded audio
+
+class ImageGenerationRequest(BaseModel):
+    user_id: str
+    prompt: str
+    model: Optional[str] = "gpt-image-1"
+
+class VideoGenerationRequest(BaseModel):
+    user_id: str
+    prompt: str
+    duration: Optional[int] = 5  # seconds
 
 class MemoryCreate(BaseModel):
     user_id: str

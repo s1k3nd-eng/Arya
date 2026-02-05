@@ -13,6 +13,7 @@ from datetime import datetime
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
 from elevenlabs.client import ElevenLabs
+from piper import PiperVoice
 import json
 import asyncio
 import base64
@@ -30,6 +31,7 @@ from pathlib import Path as PathLib
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
+import wave
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')

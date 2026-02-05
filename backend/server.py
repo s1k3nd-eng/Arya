@@ -1038,6 +1038,68 @@ async def generate_voice(request: ChatRequest):
         logger.error(f"Voice generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/internet/search")
+async def internet_search(query: str, max_results: int = 5):
+    """Arya searches the internet"""
+    try:
+        results = arya_internet.web_search(query, max_results)
+        return {
+            "query": query,
+            "results": results,
+            "count": len(results)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/internet/download")
+async def download_file(url: str):
+    """Arya downloads a file from the internet"""
+    try:
+        file_path = arya_internet.download_file(url)
+        if file_path:
+            return {"url": url, "saved_path": file_path}
+        else:
+            raise HTTPException(status_code=400, detail="Download failed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/internet/scrape")
+async def scrape_webpage(url: str):
+    """Arya scrapes and reads a webpage"""
+    try:
+        data = arya_internet.scrape_webpage(url)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/voice/autonomous-selection")
+async def autonomous_voice_selection():
+    """Arya autonomously researches and selects her own voice"""
+    try:
+        research_log = await arya_internet.autonomous_voice_research()
+        
+        # Update voice ID based on her choice
+        global ARYA_VOICE_ID
+        if research_log["selected_voice"]:
+            ARYA_VOICE_ID = research_log["selected_voice"]["id"]
+            
+            # Store in database
+            await db.system_config.update_one(
+                {"key": "arya_voice_id"},
+                {"$set": {"value": ARYA_VOICE_ID, "updated_at": datetime.utcnow()}},
+                upsert=True
+            )
+        
+        return {
+            "message": f"I've completed my research and selected {research_log['selected_voice']['name']} as my voice",
+            "research_log": research_log,
+            "selected_voice": research_log["selected_voice"],
+            "reasoning": research_log["reasoning"]
+        }
+    except Exception as e:
+        logger.error(f"Autonomous voice selection error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

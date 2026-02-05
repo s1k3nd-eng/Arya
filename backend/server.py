@@ -217,6 +217,12 @@ class SelfDiagnostics:
 # Initialize self-diagnostic system
 arya_diagnostics = SelfDiagnostics()
 
+# Initialize ElevenLabs client
+eleven_client = ElevenLabs(api_key=os.environ.get('ELEVENLABS_API_KEY'))
+
+# Store the cloned voice ID (will be set after cloning)
+ARYA_VOICE_ID = None
+
 # Create the main app without a prefix
 app = FastAPI()
 

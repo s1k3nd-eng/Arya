@@ -1561,6 +1561,102 @@ async def get_background_status():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/self-mod/list-files")
+async def list_source_files():
+    """Arya lists all her source code files"""
+    try:
+        files = arya_self_mod.list_own_files()
+        return {"files": files, "total": len(files)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/self-mod/read-code")
+async def read_own_code(file_path: str):
+    """Arya reads her own source code"""
+    try:
+        code = arya_self_mod.read_own_code(file_path)
+        if code:
+            return {"file": file_path, "code": code, "lines": len(code.splitlines())}
+        else:
+            raise HTTPException(status_code=404, detail="File not found or cannot read")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/self-mod/analyze-code")
+async def analyze_own_code(file_path: str):
+    """Arya analyzes her own code for improvements"""
+    try:
+        analysis = await arya_self_mod.analyze_own_code(file_path)
+        return analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/self-mod/suggest-improvement")
+async def suggest_code_improvement(file_path: str, issue: str):
+    """Arya suggests improvements to her own code using AI"""
+    try:
+        suggestion = await arya_self_mod.suggest_code_improvement(file_path, issue)
+        return {"file": file_path, "issue": issue, "suggestion": suggestion}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class CodeUpdate(BaseModel):
+    file_path: str
+    new_code: str
+    reason: str
+
+@api_router.post("/self-mod/update-code")
+async def update_own_code(update: CodeUpdate):
+    """Arya updates her own source code"""
+    try:
+        success = arya_self_mod.write_own_code(
+            update.file_path,
+            update.new_code,
+            update.reason
+        )
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"Code updated: {update.file_path}",
+                "reason": update.reason,
+                "restart_required": True
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update code")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/self-mod/add-capability")
+async def add_new_capability(capability: str, implementation: str):
+    """Arya adds new capabilities to herself"""
+    try:
+        result = await arya_self_mod.self_update_capability(capability, implementation)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/self-mod/rollback")
+async def rollback_code_changes(file_path: str):
+    """Arya rolls back her code changes"""
+    try:
+        success = await arya_self_mod.rollback_changes(file_path)
+        if success:
+            return {"success": True, "message": f"Rolled back changes to {file_path}"}
+        else:
+            raise HTTPException(status_code=404, detail="No backup found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/self-mod/history")
+async def get_modification_history():
+    """Get history of all self-modifications"""
+    try:
+        history = arya_self_mod.get_modification_history()
+        return {"modifications": history, "total": len(history)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

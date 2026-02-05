@@ -780,6 +780,98 @@ async def trigger_self_repair():
         arya_diagnostics.log_error("Self-Repair Error", str(e), traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/voice/clone")
+async def clone_voice():
+    """Clone Arya's voice from the uploaded audio sample"""
+    global ARYA_VOICE_ID
+    try:
+        # Read the voice file
+        voice_file_path = "/tmp/voice_preview_arya.mp3"
+        
+        with open(voice_file_path, "rb") as f:
+            voice_data = f.read()
+        
+        # Clone the voice using ElevenLabs
+        voice = eleven_client.clone(
+            name="Arya",
+            description="Arya's custom voice - elegant, futuristic AI companion",
+            files=[voice_data]
+        )
+        
+        ARYA_VOICE_ID = voice.voice_id
+        logger.info(f"Voice cloned successfully! Voice ID: {ARYA_VOICE_ID}")
+        
+        # Store in database
+        await db.system_config.update_one(
+            {"key": "arya_voice_id"},
+            {"$set": {"value": ARYA_VOICE_ID, "updated_at": datetime.utcnow()}},
+            upsert=True
+        )
+        
+        return {
+            "voice_id": ARYA_VOICE_ID,
+            "message": "Voice cloned successfully",
+            "name": "Arya"
+        }
+    except Exception as e:
+        logger.error(f"Voice cloning error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/voice/id")
+async def get_voice_id():
+    """Get Arya's cloned voice ID"""
+    global ARYA_VOICE_ID
+    
+    # Check if voice ID is already set
+    if ARYA_VOICE_ID:
+        return {"voice_id": ARYA_VOICE_ID}
+    
+    # Try to load from database
+    config = await db.system_config.find_one({"key": "arya_voice_id"})
+    if config:
+        ARYA_VOICE_ID = config["value"]
+        return {"voice_id": ARYA_VOICE_ID}
+    
+    return {"voice_id": None, "message": "Voice not cloned yet"}
+
+@api_router.post("/voice/generate")
+async def generate_voice(request: ChatRequest):
+    """Generate speech audio using cloned voice"""
+    global ARYA_VOICE_ID
+    
+    try:
+        # Ensure voice is cloned
+        if not ARYA_VOICE_ID:
+            config = await db.system_config.find_one({"key": "arya_voice_id"})
+            if config:
+                ARYA_VOICE_ID = config["value"]
+            else:
+                raise HTTPException(status_code=400, detail="Voice not cloned yet. Call /voice/clone first.")
+        
+        # Generate speech using ElevenLabs
+        audio_generator = eleven_client.text_to_speech.convert(
+            text=request.message,
+            voice_id=ARYA_VOICE_ID,
+            model_id="eleven_multilingual_v2"
+        )
+        
+        # Collect audio data
+        audio_data = b""
+        for chunk in audio_generator:
+            audio_data += chunk
+        
+        # Convert to base64
+        audio_b64 = base64.b64encode(audio_data).decode()
+        
+        return {
+            "audio_base64": audio_b64,
+            "voice_id": ARYA_VOICE_ID,
+            "text": request.message
+        }
+    except Exception as e:
+        logger.error(f"Voice generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

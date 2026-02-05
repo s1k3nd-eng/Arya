@@ -37,7 +37,7 @@ export default function MemoryScreen() {
       case 'fact':
         return 'bulb';
       case 'context':
-        return 'documents';
+        return 'document-text';
       case 'personal':
         return 'person';
       default:

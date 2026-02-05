@@ -21,6 +21,12 @@ import sys
 from collections import deque
 from datetime import datetime, timedelta
 import io
+import requests
+from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
+import tempfile
+import os as os_module
+from pathlib import Path as PathLib
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')

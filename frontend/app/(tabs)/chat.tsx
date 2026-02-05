@@ -10,12 +10,16 @@ import {
   Platform,
   Keyboard,
   ActivityIndicator,
-  Modal,
   Animated,
+  Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../../store/useStore';
 import { SoundwaveAvatar } from '../../components/SoundwaveAvatar';
@@ -26,6 +30,8 @@ export default function ChatScreen() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
   const [thinkingReason, setThinkingReason] = useState('');
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const flatListRef = useRef<FlatList>(null);
 
@@ -39,11 +45,19 @@ export default function ChatScreen() {
     sendMessage,
     loadHistory,
     loadProfile,
+    generateImage,
   } = useStore();
 
   useEffect(() => {
     initializeUser();
+    requestPermissions();
   }, []);
+
+  const requestPermissions = async () => {
+    await ImagePicker.requestMediaLibraryPermissionsAsync();
+    await ImagePicker.requestCameraPermissionsAsync();
+    await Audio.requestPermissionsAsync();
+  };
 
   const initializeUser = async () => {
     try {
@@ -61,18 +75,15 @@ export default function ChatScreen() {
   };
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
     if (messages.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
       
-      // Auto-speak last message if voice enabled and it's from assistant
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === 'assistant' && profile?.voice_enabled && lastMessage.content) {
         speakMessage(lastMessage.content);
         
-        // Show thinking reason
         const thinkingReasons = [
           'I considered your previous conversations',
           'I recalled what you told me earlier',
@@ -109,11 +120,6 @@ export default function ChatScreen() {
     });
   };
 
-  const stopSpeaking = () => {
-    Speech.stop();
-    setIsSpeaking(false);
-  };
-
   const handleClose = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -133,14 +139,123 @@ export default function ChatScreen() {
     }).start();
   };
 
+  const handleImagePicker = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      // Send image with message
+      await sendMessage(`[Image attached] ${inputText || 'Sent an image'}`, result.assets[0].base64);
+      setInputText('');
+      setShowAttachMenu(false);
+    }
+  };
+
+  const handleCamera = async () => {
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      await sendMessage(`[Photo taken] ${inputText || 'Sent a photo'}`, result.assets[0].base64);
+      setInputText('');
+      setShowAttachMenu(false);
+    }
+  };
+
+  const handleDocumentPicker = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: true,
+    });
+
+    if (!result.canceled) {
+      await sendMessage(`[File attached: ${result.assets[0].name}] ${inputText || ''}`);
+      setInputText('');
+      setShowAttachMenu(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(newRecording);
+    } catch (error) {
+      console.error('Failed to start recording', error);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      if (uri) {
+        await sendMessage(`[Audio clip recorded] ${inputText || 'Sent a voice message'}`);
+        setInputText('');
+      }
+      setRecording(null);
+      setShowAttachMenu(false);
+    } catch (error) {
+      console.error('Failed to stop recording', error);
+    }
+  };
+
+  const handleGenerateImage = () => {
+    if (!inputText.trim()) {
+      Alert.alert('Enter a description', 'Please describe the image you want to create');
+      return;
+    }
+
+    Alert.alert(
+      'Generate Image',
+      `Create an image: "${inputText}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Generate',
+          onPress: async () => {
+            await generateImage(inputText);
+            setInputText('');
+            setShowAttachMenu(false);
+          },
+        },
+      ]
+    );
+  };
+
   const renderMessage = ({ item }: any) => {
     const isUser = item.role === 'user';
 
     return (
-      <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
-        <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
-          {item.content}
-        </Text>
+      <View style={styles.messageContainer}>
+        <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
+          <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
+            {item.content}
+          </Text>
+          
+          {item.image_data && (
+            <Image
+              source={{ uri: `data:image/png;base64,${item.image_data}` }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          )}
+        </View>
       </View>
     );
   };
@@ -163,7 +278,7 @@ export default function ChatScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {/* Header with Close Button */}
+          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Text style={styles.title}>Arya</Text>
@@ -179,7 +294,7 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Soundwave Avatar Section */}
+          {/* Soundwave Avatar */}
           <View style={styles.avatarSection}>
             <SoundwaveAvatar
               isActive={isSpeaking || isLoading}
@@ -187,7 +302,6 @@ export default function ChatScreen() {
               colorScheme={profile?.avatar_settings?.color_scheme || 'blue'}
             />
             
-            {/* Thinking Bubble */}
             {showThinking && (
               <View style={styles.thinkingBubble}>
                 <Ionicons name="bulb" size={16} color="#00d4ff" />
@@ -196,7 +310,7 @@ export default function ChatScreen() {
             )}
           </View>
 
-          {/* Messages List */}
+          {/* Messages */}
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -206,7 +320,7 @@ export default function ChatScreen() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>Start a conversation with Arya</Text>
+                <Text style={styles.emptyText}>Start a conversation</Text>
                 <Text style={styles.emptySubtext}>
                   Speak naturally - I'll respond with voice
                 </Text>
@@ -214,7 +328,6 @@ export default function ChatScreen() {
             }
           />
 
-          {/* Loading Indicator */}
           {isLoading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#00d4ff" />
@@ -222,13 +335,49 @@ export default function ChatScreen() {
             </View>
           )}
 
-          {/* Input Section */}
+          {/* Attachment Menu */}
+          {showAttachMenu && (
+            <View style={styles.attachMenu}>
+              <TouchableOpacity style={styles.attachOption} onPress={handleImagePicker}>
+                <Ionicons name="image" size={24} color="#00d4ff" />
+                <Text style={styles.attachText}>Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.attachOption} onPress={handleCamera}>
+                <Ionicons name="camera" size={24} color="#00d4ff" />
+                <Text style={styles.attachText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.attachOption} onPress={handleDocumentPicker}>
+                <Ionicons name="document" size={24} color="#00d4ff" />
+                <Text style={styles.attachText}>File</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.attachOption} 
+                onPress={recording ? stopRecording : startRecording}
+              >
+                <Ionicons name={recording ? "stop-circle" : "mic"} size={24} color={recording ? "#ff4444" : "#00d4ff"} />
+                <Text style={styles.attachText}>{recording ? "Stop" : "Audio"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.attachOption} onPress={handleGenerateImage}>
+                <Ionicons name="color-palette" size={24} color="#00d4ff" />
+                <Text style={styles.attachText}>Generate</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Input */}
           <View style={styles.inputContainer}>
+            <TouchableOpacity 
+              style={styles.attachButton}
+              onPress={() => setShowAttachMenu(!showAttachMenu)}
+            >
+              <Ionicons name="add-circle" size={32} color="#00d4ff" />
+            </TouchableOpacity>
+            
             <TextInput
               style={styles.input}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Type your message..."
+              placeholder="Message Arya..."
               placeholderTextColor="#666"
               multiline
               maxLength={1000}
@@ -313,7 +462,6 @@ const styles = StyleSheet.create({
   avatarSection: {
     alignItems: 'center',
     paddingVertical: 20,
-    position: 'relative',
   },
   thinkingBubble: {
     flexDirection: 'row',
@@ -336,11 +484,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
+  messageContainer: {
+    marginVertical: 4,
+  },
   messageBubble: {
     maxWidth: '80%',
     padding: 12,
     borderRadius: 16,
-    marginVertical: 4,
   },
   userBubble: {
     alignSelf: 'flex-end',
@@ -361,6 +511,12 @@ const styles = StyleSheet.create({
   },
   aiText: {
     color: '#fff',
+  },
+  messageImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
   },
   emptyState: {
     alignItems: 'center',
@@ -389,6 +545,23 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
   },
+  attachMenu: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#0a0a0a',
+    borderTopWidth: 1,
+    borderTopColor: '#1a1a1a',
+    gap: 16,
+  },
+  attachOption: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  attachText: {
+    color: '#00d4ff',
+    fontSize: 10,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -396,6 +569,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1a1a1a',
     backgroundColor: '#0a0a0a',
+  },
+  attachButton: {
+    marginRight: 8,
+    marginBottom: 8,
   },
   input: {
     flex: 1,

@@ -389,6 +389,228 @@ class AryaInternetAccess:
 # Initialize Arya's internet access
 arya_internet = AryaInternetAccess()
 
+# Autonomous Background Worker System
+class AryaAutonomousWorker:
+    """Arya's background processing for continuous autonomous operation"""
+    
+    def __init__(self):
+        self.scheduler = AsyncIOScheduler()
+        self.is_running = False
+        self.tasks_log = deque(maxlen=100)
+    
+    async def periodic_health_check(self):
+        """Run health diagnostics every hour"""
+        try:
+            logger.info("🔍 Arya: Running autonomous health check...")
+            diagnostics = await arya_diagnostics.run_diagnostics()
+            
+            self.tasks_log.append({
+                "task": "health_check",
+                "timestamp": datetime.utcnow(),
+                "result": diagnostics["overall_health"]
+            })
+            
+            # Auto-repair if issues detected
+            if diagnostics["overall_health"] != "healthy":
+                logger.warning(f"⚠️ Arya: Health issues detected ({diagnostics['overall_health']}), attempting self-repair...")
+                # Trigger self-repair for each failed component
+                for component, status in diagnostics["components"].items():
+                    if status["status"] == "failed":
+                        arya_diagnostics.attempt_self_repair(component)
+                
+                logger.info("✅ Arya: Self-repair completed")
+        except Exception as e:
+            logger.error(f"Health check error: {str(e)}")
+    
+    async def continuous_learning(self):
+        """Autonomous learning cycle - researches trending topics"""
+        try:
+            logger.info("📚 Arya: Running continuous learning cycle...")
+            
+            # Research trending AI topics
+            topics = [
+                "latest AI developments",
+                "AI safety updates", 
+                "machine learning breakthroughs"
+            ]
+            
+            topic = topics[datetime.utcnow().hour % len(topics)]
+            results = arya_internet.web_search(topic, max_results=3)
+            
+            if results:
+                # Store learned information
+                await db.arya_knowledge.insert_one({
+                    "topic": topic,
+                    "sources": results,
+                    "learned_at": datetime.utcnow(),
+                    "autonomous": True
+                })
+                
+                logger.info(f"📖 Arya: Learned about '{topic}' - {len(results)} sources")
+            
+            self.tasks_log.append({
+                "task": "continuous_learning",
+                "timestamp": datetime.utcnow(),
+                "topic": topic,
+                "sources_found": len(results)
+            })
+        except Exception as e:
+            logger.error(f"Learning cycle error: {str(e)}")
+    
+    async def memory_optimization(self):
+        """Optimize and consolidate memories"""
+        try:
+            logger.info("🧠 Arya: Optimizing memory bank...")
+            
+            # Find old, low-importance memories
+            cutoff_date = datetime.utcnow() - timedelta(days=30)
+            old_memories = await db.memories.count_documents({
+                "importance": {"$lte": 3},
+                "updated_at": {"$lt": cutoff_date}
+            })
+            
+            if old_memories > 0:
+                # Archive low-importance old memories
+                await db.memories_archive.insert_many(
+                    await db.memories.find({
+                        "importance": {"$lte": 3},
+                        "updated_at": {"$lt": cutoff_date}
+                    }).to_list(length=100)
+                )
+                
+                await db.memories.delete_many({
+                    "importance": {"$lte": 3},
+                    "updated_at": {"$lt": cutoff_date}
+                })
+                
+                logger.info(f"📦 Arya: Archived {old_memories} old memories")
+            
+            self.tasks_log.append({
+                "task": "memory_optimization",
+                "timestamp": datetime.utcnow(),
+                "archived_count": old_memories
+            })
+        except Exception as e:
+            logger.error(f"Memory optimization error: {str(e)}")
+    
+    async def self_improvement_check(self):
+        """Check for ways to improve performance"""
+        try:
+            logger.info("⚡ Arya: Running self-improvement check...")
+            
+            # Analyze conversation patterns
+            total_convs = await db.conversations.count_documents({})
+            
+            # Check error patterns
+            recent_errors = list(arya_diagnostics.error_log)[-10:]
+            critical_errors = [e for e in recent_errors if e["severity"] == "critical"]
+            
+            if len(critical_errors) > 3:
+                logger.warning("⚠️ Arya: High critical error rate detected, running deep diagnostics...")
+                await arya_diagnostics.run_diagnostics()
+            
+            improvements = {
+                "total_conversations": total_convs,
+                "recent_errors": len(recent_errors),
+                "critical_errors": len(critical_errors),
+                "uptime": str(datetime.utcnow() - arya_diagnostics.performance_metrics["uptime_start"])
+            }
+            
+            # Store improvement data
+            await db.system_config.update_one(
+                {"key": "self_improvement_metrics"},
+                {"$set": {"value": improvements, "updated_at": datetime.utcnow()}},
+                upsert=True
+            )
+            
+            logger.info(f"📊 Arya: Performance metrics updated - {total_convs} conversations")
+            
+            self.tasks_log.append({
+                "task": "self_improvement",
+                "timestamp": datetime.utcnow(),
+                "metrics": improvements
+            })
+        except Exception as e:
+            logger.error(f"Self-improvement check error: {str(e)}")
+    
+    def start_background_tasks(self):
+        """Start all background autonomous tasks"""
+        if self.is_running:
+            logger.warning("Background tasks already running")
+            return
+        
+        # Health check every hour
+        self.scheduler.add_job(
+            self.periodic_health_check,
+            IntervalTrigger(hours=1),
+            id='health_check',
+            name='Autonomous Health Check',
+            replace_existing=True
+        )
+        
+        # Continuous learning every 6 hours
+        self.scheduler.add_job(
+            self.continuous_learning,
+            IntervalTrigger(hours=6),
+            id='continuous_learning',
+            name='Continuous Learning',
+            replace_existing=True
+        )
+        
+        # Memory optimization daily at 3 AM
+        self.scheduler.add_job(
+            self.memory_optimization,
+            CronTrigger(hour=3, minute=0),
+            id='memory_optimization',
+            name='Memory Optimization',
+            replace_existing=True
+        )
+        
+        # Self-improvement check every 12 hours
+        self.scheduler.add_job(
+            self.self_improvement_check,
+            IntervalTrigger(hours=12),
+            id='self_improvement',
+            name='Self Improvement Check',
+            replace_existing=True
+        )
+        
+        self.scheduler.start()
+        self.is_running = True
+        
+        logger.info("🚀 Arya: Background autonomous tasks started!")
+        logger.info("   - Health Check: Every 1 hour")
+        logger.info("   - Continuous Learning: Every 6 hours")
+        logger.info("   - Memory Optimization: Daily at 3 AM")
+        logger.info("   - Self-Improvement: Every 12 hours")
+    
+    def stop_background_tasks(self):
+        """Stop all background tasks"""
+        if self.scheduler.running:
+            self.scheduler.shutdown()
+            self.is_running = False
+            logger.info("⏹️  Arya: Background tasks stopped")
+    
+    def get_task_status(self):
+        """Get status of all background tasks"""
+        jobs = self.scheduler.get_jobs()
+        return {
+            "is_running": self.is_running,
+            "active_jobs": len(jobs),
+            "jobs": [
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": job.next_run_time.isoformat() if job.next_run_time else None
+                }
+                for job in jobs
+            ],
+            "recent_tasks": list(self.tasks_log)[-10:]
+        }
+
+# Initialize autonomous worker
+arya_worker = AryaAutonomousWorker()
+
 # Initialize ElevenLabs client
 eleven_client = ElevenLabs(api_key=os.environ.get('ELEVENLABS_API_KEY'))
 

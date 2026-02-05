@@ -788,14 +788,11 @@ async def clone_voice():
         # Read the voice file
         voice_file_path = "/tmp/voice_preview_arya.mp3"
         
-        with open(voice_file_path, "rb") as f:
-            voice_data = f.read()
-        
-        # Clone the voice using ElevenLabs
-        voice = eleven_client.clone(
+        # Clone the voice using ElevenLabs IVC (Instant Voice Cloning)
+        voice = eleven_client.voices.add(
             name="Arya",
             description="Arya's custom voice - elegant, futuristic AI companion",
-            files=[voice_data]
+            files=[voice_file_path]
         )
         
         ARYA_VOICE_ID = voice.voice_id

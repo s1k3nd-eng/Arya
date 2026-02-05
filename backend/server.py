@@ -27,6 +27,9 @@ from duckduckgo_search import DDGS
 import tempfile
 import os as os_module
 from pathlib import Path as PathLib
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')

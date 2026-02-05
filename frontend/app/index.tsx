@@ -1,16 +1,39 @@
-import { Text, View, StyleSheet, Image } from "react-native";
-
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import React, { useEffect } from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
+  const router = useRouter();
+
+  useEffect(() => {
+    initializeUser();
+  }, []);
+
+  const initializeUser = async () => {
+    try {
+      let userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        // Generate new user ID
+        userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await AsyncStorage.setItem('userId', userId);
+      }
+      
+      // Navigate to main app
+      setTimeout(() => {
+        router.replace('/(tabs)/chat');
+      }, 1000);
+    } catch (error) {
+      console.error('Init error:', error);
+      setTimeout(() => {
+        router.replace('/(tabs)/chat');
+      }, 1000);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
+      <ActivityIndicator size="large" color="#00d4ff" />
     </View>
   );
 }
@@ -18,13 +41,8 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0c0c0c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

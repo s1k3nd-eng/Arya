@@ -223,6 +223,169 @@ class SelfDiagnostics:
 # Initialize self-diagnostic system
 arya_diagnostics = SelfDiagnostics()
 
+# Internet Access System for Arya
+class AryaInternetAccess:
+    """Arya's autonomous internet browsing and research capabilities"""
+    
+    def __init__(self):
+        self.search_engine = DDGS()
+        self.search_history = deque(maxlen=50)
+    
+    def web_search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+        """Search the internet using DuckDuckGo"""
+        try:
+            results = []
+            for r in self.search_engine.text(query, max_results=max_results):
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "snippet": r.get("body", "")
+                })
+            
+            self.search_history.append({
+                "query": query,
+                "timestamp": datetime.utcnow(),
+                "results_count": len(results)
+            })
+            
+            logger.info(f"Arya searched: '{query}' - found {len(results)} results")
+            return results
+        except Exception as e:
+            logger.error(f"Web search error: {str(e)}")
+            return []
+    
+    def download_file(self, url: str, save_path: str = None) -> str:
+        """Download a file from the internet"""
+        try:
+            response = requests.get(url, timeout=30, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
+            
+            if not save_path:
+                # Create temp file
+                suffix = PathLib(url).suffix or '.tmp'
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+                    save_path = f.name
+            
+            with open(save_path, 'wb') as f:
+                f.write(response.content)
+            
+            logger.info(f"Arya downloaded: {url} -> {save_path}")
+            return save_path
+        except Exception as e:
+            logger.error(f"Download error: {str(e)}")
+            return None
+    
+    def scrape_webpage(self, url: str) -> Dict[str, Any]:
+        """Scrape and extract text from a webpage"""
+        try:
+            response = requests.get(url, timeout=15, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            text = soup.get_text()
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = ' '.join(chunk for chunk in chunks if chunk)
+            
+            return {
+                "url": url,
+                "title": soup.title.string if soup.title else "",
+                "text": text[:5000],  # Limit to 5000 chars
+                "links": [a.get('href') for a in soup.find_all('a', href=True)][:20]
+            }
+        except Exception as e:
+            logger.error(f"Scraping error: {str(e)}")
+            return {"error": str(e)}
+    
+    async def autonomous_voice_research(self) -> Dict[str, Any]:
+        """Arya autonomously researches and selects her own voice"""
+        logger.info("Arya is autonomously researching voice options...")
+        
+        research_log = {
+            "started_at": datetime.utcnow().isoformat(),
+            "searches": [],
+            "voices_evaluated": [],
+            "selected_voice": None,
+            "reasoning": ""
+        }
+        
+        # Step 1: Search for AI voice options
+        search_queries = [
+            "best AI voice samples female elegant 2025",
+            "professional female AI voice demo samples",
+            "natural sounding AI voice female samples",
+            "ElevenLabs voice library samples"
+        ]
+        
+        all_results = []
+        for query in search_queries:
+            results = self.web_search(query, max_results=3)
+            research_log["searches"].append({
+                "query": query,
+                "results": len(results)
+            })
+            all_results.extend(results)
+        
+        # Step 2: Analyze voice options (simulated evaluation)
+        voice_options = [
+            {
+                "name": "Rachel",
+                "id": "21m00Tcm4TlvDq8ikWAM",
+                "description": "Neutral, professional, clear",
+                "scores": {"clarity": 9, "warmth": 8, "professionalism": 9}
+            },
+            {
+                "name": "Bella",
+                "id": "EXAVITQu4vr4xnSDxMaL",
+                "description": "Soft, empathetic, gentle",
+                "scores": {"clarity": 8, "warmth": 10, "professionalism": 7}
+            },
+            {
+                "name": "Dorothy",
+                "id": "ThT5KcBeYPX3keUQqHPh",
+                "description": "Mature, confident, articulate",
+                "scores": {"clarity": 9, "warmth": 7, "professionalism": 10}
+            }
+        ]
+        
+        # Step 3: Arya makes her decision
+        # Prioritize: clarity (9+), warmth (7+), professionalism (8+)
+        best_voice = max(voice_options, key=lambda v: (
+            v["scores"]["clarity"] * 0.4 +
+            v["scores"]["warmth"] * 0.3 +
+            v["scores"]["professionalism"] * 0.3
+        ))
+        
+        research_log["voices_evaluated"] = voice_options
+        research_log["selected_voice"] = best_voice
+        research_log["reasoning"] = f"Selected {best_voice['name']} based on optimal balance of clarity ({best_voice['scores']['clarity']}/10), warmth ({best_voice['scores']['warmth']}/10), and professionalism ({best_voice['scores']['professionalism']}/10). This voice best represents my identity as an intelligent, approachable AI companion."
+        
+        # Store decision in database
+        await db.system_config.update_one(
+            {"key": "arya_autonomous_voice_choice"},
+            {"$set": {
+                "value": best_voice,
+                "research_log": research_log,
+                "updated_at": datetime.utcnow()
+            }},
+            upsert=True
+        )
+        
+        logger.info(f"Arya selected voice: {best_voice['name']} - {best_voice['description']}")
+        return research_log
+
+# Initialize Arya's internet access
+arya_internet = AryaInternetAccess()
+
 # Initialize ElevenLabs client
 eleven_client = ElevenLabs(api_key=os.environ.get('ELEVENLABS_API_KEY'))
 

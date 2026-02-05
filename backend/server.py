@@ -392,6 +392,65 @@ async def clear_history(user_id: str):
         logger.error(f"Clear history error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/generate-image")
+async def generate_image(request: ImageGenerationRequest):
+    """Generate an image from text prompt"""
+    try:
+        # Initialize image generator
+        image_gen = OpenAIImageGeneration(api_key=os.environ['EMERGENT_LLM_KEY'])
+        
+        # Generate image
+        images = await image_gen.generate_images(
+            prompt=request.prompt,
+            model=request.model or "gpt-image-1",
+            number_of_images=1
+        )
+        
+        if images and len(images) > 0:
+            # Convert to base64
+            image_base64 = base64.b64encode(images[0]).decode('utf-8')
+            
+            # Save to conversation history
+            user_msg = ChatMessage(
+                role="user",
+                content=f"Generate an image: {request.prompt}"
+            )
+            await save_message(request.user_id, user_msg)
+            
+            assistant_msg = ChatMessage(
+                role="assistant",
+                content="I've created the image for you.",
+                emotion="excited"
+            )
+            assistant_msg.image_data = image_base64
+            await save_message(request.user_id, assistant_msg)
+            
+            return {
+                "image_base64": image_base64,
+                "message": "Image generated successfully"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="No image was generated")
+            
+    except Exception as e:
+        logger.error(f"Image generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/generate-video")
+async def generate_video(request: VideoGenerationRequest):
+    """Generate a video from text prompt (placeholder for now)"""
+    try:
+        # Note: Real video generation would require services like Runway, Pika, etc.
+        # For now, return a placeholder response
+        return {
+            "video_url": None,
+            "message": "Video generation coming soon! This feature requires specialized video AI services.",
+            "status": "placeholder"
+        }
+    except Exception as e:
+        logger.error(f"Video generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

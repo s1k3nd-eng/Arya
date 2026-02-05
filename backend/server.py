@@ -1681,6 +1681,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Start Arya's autonomous operations immediately on startup"""
+    logger.info("🚀 Arya: Starting autonomous operations...")
+    
+    # Start background tasks automatically
+    arya_worker.start_background_tasks()
+    
+    # Run initial diagnostics
+    initial_diagnostics = await arya_diagnostics.run_diagnostics()
+    logger.info(f"   Initial health: {initial_diagnostics['overall_health']}")
+    
+    # Auto-repair if needed
+    if initial_diagnostics['overall_health'] != 'healthy':
+        logger.info("   Running auto-repair on startup...")
+        for component, status in initial_diagnostics['components'].items():
+            if status['status'] == 'failed':
+                arya_diagnostics.attempt_self_repair(component)
+    
+    logger.info("✅ Arya: Fully autonomous and operational!")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    arya_worker.stop_background_tasks()

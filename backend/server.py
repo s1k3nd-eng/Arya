@@ -809,7 +809,7 @@ class AryaAutonomousWorkerImpl(AryaAutonomousWorker):
         }
 
 # Initialize autonomous worker
-arya_worker = AryaAutonomousWorker()
+arya_worker = AryaAutonomousWorkerImpl()
 
 # Initialize ElevenLabs client
 eleven_client = ElevenLabs(api_key=os.environ.get('ELEVENLABS_API_KEY'))

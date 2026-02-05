@@ -419,31 +419,72 @@ async def root():
 @api_router.post("/chat")
 async def chat(request: ChatRequest):
     """Send a chat message and get AI response"""
+    arya_diagnostics.performance_metrics["total_requests"] += 1
+    
     try:
-        # Get user profile and context
+        # Check if user is asking for diagnostics
+        if any(keyword in request.message.lower() for keyword in [
+            "diagnose", "diagnostic", "health check", "status check", 
+            "how are you feeling", "are you okay", "system check",
+            "debug yourself", "check yourself", "run diagnostics"
+        ]):
+            # Run self-diagnostics
+            diagnostic_report = await arya_diagnostics.run_diagnostics()
+            self_analysis = arya_diagnostics.get_self_analysis()
+            
+            # Generate detailed response
+            response_text = f"{self_analysis}\n\nDiagnostic Report:\n"
+            response_text += f"Overall Health: {diagnostic_report['overall_health'].upper()}\n"
+            response_text += f"Uptime: {diagnostic_report['uptime']}\n"
+            response_text += f"Success Rate: {diagnostic_report['performance']['success_rate']}\n\n"
+            
+            for component, status in diagnostic_report['components'].items():
+                response_text += f"- {component.replace('_', ' ').title()}: {status['status']} - {status['message']}\n"
+            
+            if diagnostic_report['recommendations']:
+                response_text += "\nRecommendations:\n"
+                for rec in diagnostic_report['recommendations']:
+                    response_text += f"- {rec}\n"
+            
+            if diagnostic_report.get('errors'):
+                response_text += f"\nRecent Errors: {len(diagnostic_report['errors'])} logged"
+            
+            # Save diagnostic conversation
+            user_msg = ChatMessage(role="user", content=request.message)
+            await save_message(request.user_id, user_msg)
+            
+            assistant_msg = ChatMessage(
+                role="assistant",
+                content=response_text,
+                emotion="thinking"
+            )
+            await save_message(request.user_id, assistant_msg)
+            
+            return {
+                "message": response_text,
+                "emotion": "thinking",
+                "diagnostic_data": diagnostic_report
+            }
+        
+        # Normal chat flow
         profile = await get_user_profile(request.user_id)
         memories = await get_relevant_memories(request.user_id)
         history = await get_conversation_history(request.user_id, limit=10)
         
-        # Save user message
         user_msg = ChatMessage(role="user", content=request.message)
         await save_message(request.user_id, user_msg)
         
-        # Build system message with context
         system_message = build_system_message(profile, memories)
         
-        # Determine which LLM to use
         provider = request.provider or profile.llm_provider
         model = request.model or profile.llm_model
         
-        # Initialize LLM chat
         chat_session = LlmChat(
             api_key=os.environ['EMERGENT_LLM_KEY'],
             session_id=request.user_id,
             system_message=system_message
         )
         
-        # Set the model based on provider
         if provider == "openai":
             chat_session.with_model("openai", model)
         elif provider == "anthropic":
@@ -451,14 +492,11 @@ async def chat(request: ChatRequest):
         elif provider == "gemini":
             chat_session.with_model("gemini", model)
         
-        # Get response
         user_message = UserMessage(text=request.message)
         response = await chat_session.send_message(user_message)
         
-        # Determine emotion from response
         emotion = determine_emotion(response)
         
-        # Save assistant message
         assistant_msg = ChatMessage(
             role="assistant",
             content=response,
@@ -474,6 +512,16 @@ async def chat(request: ChatRequest):
         }
         
     except Exception as e:
+        arya_diagnostics.performance_metrics["failed_requests"] += 1
+        arya_diagnostics.log_error(
+            "Chat Error",
+            str(e),
+            traceback.format_exc()
+        )
+        
+        # Attempt self-repair
+        repair_result = arya_diagnostics.attempt_self_repair(str(e))
+        
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 

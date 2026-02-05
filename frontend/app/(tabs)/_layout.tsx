@@ -30,7 +30,7 @@ export default function TabsLayout() {
         options={{
           title: 'Memory',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="brain" size={size} color={color} />
+            <Ionicons name="albums" size={size} color={color} />
           ),
         }}
       />

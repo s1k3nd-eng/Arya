@@ -59,6 +59,7 @@ interface AppState {
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   setCurrentEmotion: (emotion: string) => void;
   clearHistory: () => Promise<void>;
+  generateImage: (prompt: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({

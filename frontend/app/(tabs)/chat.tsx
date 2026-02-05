@@ -110,10 +110,13 @@ export default function ChatScreen() {
 
   const speakMessage = (text: string) => {
     setIsSpeaking(true);
+    
+    // Enhanced voice settings for better quality
     Speech.speak(text, {
       language: 'en-US',
-      pitch: 1.1,
-      rate: 0.95,
+      pitch: 1.15,  // Slightly higher, more feminine
+      rate: 0.92,   // Slower, clearer
+      voice: 'com.apple.voice.compact.en-US.Samantha', // iOS: Samantha voice
       onDone: () => setIsSpeaking(false),
       onStopped: () => setIsSpeaking(false),
       onError: () => setIsSpeaking(false),

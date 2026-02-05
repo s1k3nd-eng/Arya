@@ -9,6 +9,9 @@ interface Message {
   content: string;
   timestamp: string;
   emotion?: string;
+  image_data?: string;
+  audio_data?: string;
+  file_name?: string;
 }
 
 interface Memory {

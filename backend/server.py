@@ -591,6 +591,9 @@ Provide specific, actionable suggestions."""
 
 # Initialize self-modification system
 arya_self_mod = AryaSelfModification()
+
+class AryaAutonomousWorkerImpl(AryaAutonomousWorker):
+    """Extended worker with background task implementations"""
     
     async def periodic_health_check(self):
         """Run health diagnostics every hour"""

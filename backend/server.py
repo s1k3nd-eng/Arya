@@ -45,6 +45,9 @@ class ChatMessage(BaseModel):
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     emotion: Optional[str] = None  # For assistant messages
+    image_data: Optional[str] = None  # base64 image
+    audio_data: Optional[str] = None  # base64 audio
+    file_name: Optional[str] = None  # attachment filename
 
 class ConversationHistory(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))

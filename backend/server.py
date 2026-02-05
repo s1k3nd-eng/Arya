@@ -1338,6 +1338,35 @@ async def autonomous_voice_selection():
         logger.error(f"Autonomous voice selection error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/background/start")
+async def start_background_tasks():
+    """Start Arya's autonomous background tasks"""
+    try:
+        arya_worker.start_background_tasks()
+        return {
+            "message": "Background autonomous tasks started",
+            "status": arya_worker.get_task_status()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/background/stop")
+async def stop_background_tasks():
+    """Stop Arya's autonomous background tasks"""
+    try:
+        arya_worker.stop_background_tasks()
+        return {"message": "Background tasks stopped"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/background/status")
+async def get_background_status():
+    """Get status of autonomous background tasks"""
+    try:
+        return arya_worker.get_task_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

@@ -693,6 +693,77 @@ async def generate_video(request: VideoGenerationRequest):
         logger.error(f"Video generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/diagnostics")
+async def get_diagnostics():
+    """Get Arya's self-diagnostic report"""
+    try:
+        diagnostic_report = await arya_diagnostics.run_diagnostics()
+        return diagnostic_report
+    except Exception as e:
+        arya_diagnostics.log_error("Diagnostic Error", str(e), traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/health")
+async def health_check():
+    """Quick health check endpoint"""
+    try:
+        return {
+            "status": arya_diagnostics.health_status["overall"],
+            "components": arya_diagnostics.health_status,
+            "uptime": str(datetime.utcnow() - arya_diagnostics.performance_metrics["uptime_start"]),
+            "self_analysis": arya_diagnostics.get_self_analysis()
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@api_router.get("/errors")
+async def get_error_log():
+    """Get recent error log"""
+    try:
+        errors = [
+            {
+                "timestamp": err["timestamp"].isoformat(),
+                "type": err["type"],
+                "message": err["message"],
+                "severity": err["severity"]
+            }
+            for err in list(arya_diagnostics.error_log)
+        ]
+        return {"errors": errors, "total": len(errors)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/self-repair")
+async def trigger_self_repair():
+    """Trigger Arya's self-repair mechanisms"""
+    try:
+        # Run diagnostics first
+        diagnostics = await arya_diagnostics.run_diagnostics()
+        
+        repair_actions = []
+        if diagnostics["overall_health"] != "healthy":
+            # Attempt repairs based on issues found
+            for component, status in diagnostics["components"].items():
+                if status["status"] == "failed":
+                    repair_result = arya_diagnostics.attempt_self_repair(component)
+                    repair_actions.append({
+                        "component": component,
+                        "repair": repair_result
+                    })
+        
+        # Re-run diagnostics after repair
+        post_repair_diagnostics = await arya_diagnostics.run_diagnostics()
+        
+        return {
+            "pre_repair_status": diagnostics["overall_health"],
+            "post_repair_status": post_repair_diagnostics["overall_health"],
+            "repair_actions": repair_actions,
+            "message": "Self-repair sequence completed"
+        }
+    except Exception as e:
+        arya_diagnostics.log_error("Self-Repair Error", str(e), traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

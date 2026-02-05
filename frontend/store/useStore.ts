@@ -206,4 +206,30 @@ export const useStore = create<AppState>((set, get) => ({
       console.error('Clear history error:', error);
     }
   },
+
+  generateImage: async (prompt: string) => {
+    const { userId } = get();
+    if (!userId) return;
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/generate-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          prompt,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate image');
+
+      // Reload history to get the new messages with image
+      await get().loadHistory();
+      set({ isLoading: false });
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+    }
+  },
 }));

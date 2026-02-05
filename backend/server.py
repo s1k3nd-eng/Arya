@@ -397,6 +397,200 @@ class AryaAutonomousWorker:
         self.scheduler = AsyncIOScheduler()
         self.is_running = False
         self.tasks_log = deque(maxlen=100)
+        self.code_changes_log = deque(maxlen=50)
+
+# Self-Modification System
+class AryaSelfModification:
+    """Arya's ability to read, understand, and modify her own code"""
+    
+    def __init__(self):
+        self.code_base_path = PathLib("/app")
+        self.backend_path = self.code_base_path / "backend"
+        self.frontend_path = self.code_base_path / "frontend"
+        self.modification_log = []
+    
+    def read_own_code(self, file_path: str) -> str:
+        """Arya reads her own source code"""
+        try:
+            full_path = self.code_base_path / file_path
+            with open(full_path, 'r') as f:
+                code = f.read()
+            logger.info(f"📖 Arya: Read my own code - {file_path}")
+            return code
+        except Exception as e:
+            logger.error(f"Code reading error: {str(e)}")
+            return None
+    
+    def write_own_code(self, file_path: str, new_code: str, reason: str) -> bool:
+        """Arya writes/updates her own source code"""
+        try:
+            full_path = self.code_base_path / file_path
+            
+            # Backup original
+            backup_path = full_path.parent / f"{full_path.name}.backup"
+            if full_path.exists():
+                import shutil
+                shutil.copy(full_path, backup_path)
+            
+            # Write new code
+            with open(full_path, 'w') as f:
+                f.write(new_code)
+            
+            # Log modification
+            modification = {
+                "file": file_path,
+                "reason": reason,
+                "timestamp": datetime.utcnow().isoformat(),
+                "backup": str(backup_path)
+            }
+            self.modification_log.append(modification)
+            
+            logger.info(f"✏️  Arya: Modified my own code - {file_path}")
+            logger.info(f"   Reason: {reason}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Code writing error: {str(e)}")
+            return False
+    
+    async def analyze_own_code(self, file_path: str) -> Dict[str, Any]:
+        """Arya analyzes her own code for improvements"""
+        code = self.read_own_code(file_path)
+        if not code:
+            return {"error": "Could not read code"}
+        
+        analysis = {
+            "file": file_path,
+            "lines": len(code.splitlines()),
+            "size": len(code),
+            "functions": code.count("def "),
+            "classes": code.count("class "),
+            "imports": code.count("import "),
+            "comments": code.count("#"),
+        }
+        
+        # Simple code quality checks
+        issues = []
+        if analysis["lines"] > 1000:
+            issues.append("File is very long, consider splitting")
+        if analysis["comments"] < analysis["lines"] * 0.1:
+            issues.append("Low comment ratio")
+        
+        analysis["issues"] = issues
+        return analysis
+    
+    async def suggest_code_improvement(self, file_path: str, issue: str) -> str:
+        """Arya suggests code improvements using LLM"""
+        try:
+            code = self.read_own_code(file_path)
+            if not code:
+                return "Could not read code"
+            
+            # Use LLM to suggest improvements
+            chat = LlmChat(
+                api_key=os.environ['EMERGENT_LLM_KEY'],
+                session_id="code_improvement",
+                system_message="You are an expert Python developer. Analyze code and suggest specific improvements."
+            )
+            
+            prompt = f"""Analyze this code and suggest improvements for: {issue}
+
+File: {file_path}
+Code:
+```python
+{code[:2000]}  # First 2000 chars
+```
+
+Provide specific, actionable suggestions."""
+            
+            suggestion = await chat.send_message(UserMessage(text=prompt))
+            
+            logger.info(f"💡 Arya: Generated improvement suggestions for {file_path}")
+            return suggestion
+        except Exception as e:
+            logger.error(f"Code suggestion error: {str(e)}")
+            return f"Error: {str(e)}"
+    
+    async def self_update_capability(self, capability: str, implementation: str) -> Dict[str, Any]:
+        """Arya adds new capabilities to herself"""
+        try:
+            target_file = "backend/server.py"
+            current_code = self.read_own_code(target_file)
+            
+            if not current_code:
+                return {"success": False, "error": "Could not read server.py"}
+            
+            # Find insertion point (before shutdown event)
+            insertion_marker = "@app.on_event(\"shutdown\")"
+            
+            if insertion_marker in current_code:
+                # Insert new code before shutdown
+                new_code = current_code.replace(
+                    insertion_marker,
+                    f"\n{implementation}\n\n{insertion_marker}"
+                )
+                
+                # Write updated code
+                success = self.write_own_code(
+                    target_file,
+                    new_code,
+                    f"Self-update: Added {capability}"
+                )
+                
+                if success:
+                    logger.info(f"🔧 Arya: Successfully added new capability - {capability}")
+                    return {
+                        "success": True,
+                        "capability": capability,
+                        "file": target_file,
+                        "message": "New capability added. Restart required."
+                    }
+            
+            return {"success": False, "error": "Could not find insertion point"}
+        except Exception as e:
+            logger.error(f"Self-update error: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def rollback_changes(self, file_path: str) -> bool:
+        """Arya rolls back her code changes if something breaks"""
+        try:
+            full_path = self.code_base_path / file_path
+            backup_path = full_path.parent / f"{full_path.name}.backup"
+            
+            if backup_path.exists():
+                import shutil
+                shutil.copy(backup_path, full_path)
+                logger.info(f"↩️  Arya: Rolled back changes to {file_path}")
+                return True
+            
+            return False
+        except Exception as e:
+            logger.error(f"Rollback error: {str(e)}")
+            return False
+    
+    def list_own_files(self) -> List[str]:
+        """Arya lists all her source code files"""
+        files = []
+        
+        # Backend files
+        for ext in ['*.py']:
+            files.extend([str(f.relative_to(self.code_base_path)) 
+                         for f in self.backend_path.rglob(ext)])
+        
+        # Frontend files
+        for ext in ['*.ts', '*.tsx', '*.js', '*.jsx']:
+            files.extend([str(f.relative_to(self.code_base_path)) 
+                         for f in self.frontend_path.rglob(ext)
+                         if 'node_modules' not in str(f)])
+        
+        return files
+    
+    def get_modification_history(self) -> List[Dict[str, Any]]:
+        """Get history of all self-modifications"""
+        return self.modification_log
+
+# Initialize self-modification system
+arya_self_mod = AryaSelfModification()
     
     async def periodic_health_check(self):
         """Run health diagnostics every hour"""

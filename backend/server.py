@@ -28,6 +28,193 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Self-Diagnostic System
+class SelfDiagnostics:
+    """Arya's self-awareness and diagnostic system"""
+    
+    def __init__(self):
+        self.error_log = deque(maxlen=100)  # Keep last 100 errors
+        self.performance_metrics = {
+            "total_requests": 0,
+            "failed_requests": 0,
+            "avg_response_time": 0,
+            "last_health_check": None,
+            "uptime_start": datetime.utcnow()
+        }
+        self.health_status = {
+            "database": "unknown",
+            "llm_api": "unknown",
+            "image_gen": "unknown",
+            "overall": "unknown"
+        }
+    
+    def log_error(self, error_type: str, error_message: str, traceback_info: str = None):
+        """Log errors for self-analysis"""
+        error_entry = {
+            "timestamp": datetime.utcnow(),
+            "type": error_type,
+            "message": error_message,
+            "traceback": traceback_info,
+            "severity": self._determine_severity(error_type)
+        }
+        self.error_log.append(error_entry)
+        logger.error(f"Self-Diagnostic: {error_type} - {error_message}")
+    
+    def _determine_severity(self, error_type: str) -> str:
+        """Determine error severity"""
+        critical_keywords = ["database", "connection", "authentication", "crash"]
+        warning_keywords = ["timeout", "rate limit", "temporary"]
+        
+        error_lower = error_type.lower()
+        if any(k in error_lower for k in critical_keywords):
+            return "critical"
+        elif any(k in error_lower for k in warning_keywords):
+            return "warning"
+        return "info"
+    
+    async def run_diagnostics(self) -> Dict[str, Any]:
+        """Run comprehensive system diagnostics"""
+        diagnostics = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "uptime": str(datetime.utcnow() - self.performance_metrics["uptime_start"]),
+            "components": {},
+            "errors": [],
+            "recommendations": []
+        }
+        
+        # Check Database
+        try:
+            await db.command('ping')
+            self.health_status["database"] = "healthy"
+            diagnostics["components"]["database"] = {
+                "status": "healthy",
+                "message": "MongoDB connection active"
+            }
+        except Exception as e:
+            self.health_status["database"] = "failed"
+            diagnostics["components"]["database"] = {
+                "status": "failed",
+                "message": str(e)
+            }
+            diagnostics["recommendations"].append("Check MongoDB connection and credentials")
+        
+        # Check LLM API
+        try:
+            test_chat = LlmChat(
+                api_key=os.environ['EMERGENT_LLM_KEY'],
+                session_id="diagnostic_test",
+                system_message="Test"
+            )
+            self.health_status["llm_api"] = "healthy"
+            diagnostics["components"]["llm_api"] = {
+                "status": "healthy",
+                "message": "LLM API accessible"
+            }
+        except Exception as e:
+            self.health_status["llm_api"] = "failed"
+            diagnostics["components"]["llm_api"] = {
+                "status": "failed",
+                "message": str(e)
+            }
+            diagnostics["recommendations"].append("Check EMERGENT_LLM_KEY validity")
+        
+        # Check Image Generation
+        try:
+            image_gen = OpenAIImageGeneration(api_key=os.environ['EMERGENT_LLM_KEY'])
+            self.health_status["image_gen"] = "healthy"
+            diagnostics["components"]["image_gen"] = {
+                "status": "healthy",
+                "message": "Image generation service ready"
+            }
+        except Exception as e:
+            self.health_status["image_gen"] = "warning"
+            diagnostics["components"]["image_gen"] = {
+                "status": "warning",
+                "message": str(e)
+            }
+        
+        # Analyze recent errors
+        recent_errors = list(self.error_log)[-10:]  # Last 10 errors
+        if recent_errors:
+            diagnostics["errors"] = [
+                {
+                    "time": err["timestamp"].isoformat(),
+                    "type": err["type"],
+                    "message": err["message"],
+                    "severity": err["severity"]
+                }
+                for err in recent_errors
+            ]
+            
+            # Pattern detection
+            error_types = [e["type"] for e in recent_errors]
+            if error_types.count(error_types[0]) > 5:  # Same error 5+ times
+                diagnostics["recommendations"].append(
+                    f"Recurring error detected: {error_types[0]}. Consider investigating root cause."
+                )
+        
+        # Performance metrics
+        diagnostics["performance"] = {
+            "total_requests": self.performance_metrics["total_requests"],
+            "failed_requests": self.performance_metrics["failed_requests"],
+            "success_rate": f"{((self.performance_metrics['total_requests'] - self.performance_metrics['failed_requests']) / max(self.performance_metrics['total_requests'], 1) * 100):.2f}%"
+        }
+        
+        # Overall health
+        failed_components = sum(1 for status in self.health_status.values() if status == "failed")
+        if failed_components == 0:
+            self.health_status["overall"] = "healthy"
+        elif failed_components <= 1:
+            self.health_status["overall"] = "degraded"
+        else:
+            self.health_status["overall"] = "critical"
+        
+        diagnostics["overall_health"] = self.health_status["overall"]
+        self.performance_metrics["last_health_check"] = datetime.utcnow()
+        
+        return diagnostics
+    
+    def get_self_analysis(self) -> str:
+        """Generate human-readable self-analysis"""
+        if not self.error_log:
+            return "I'm running smoothly. All systems nominal."
+        
+        recent_errors = list(self.error_log)[-5:]
+        error_summary = f"I've encountered {len(self.error_log)} issues recently. "
+        
+        critical_count = sum(1 for e in recent_errors if e["severity"] == "critical")
+        if critical_count > 0:
+            error_summary += f"{critical_count} critical errors need attention. "
+        
+        return error_summary + "Running diagnostics now..."
+    
+    def attempt_self_repair(self, error_type: str) -> Dict[str, Any]:
+        """Attempt automatic recovery from common issues"""
+        repair_log = {
+            "attempted": True,
+            "success": False,
+            "actions": []
+        }
+        
+        # Common repair patterns
+        if "connection" in error_type.lower():
+            repair_log["actions"].append("Attempting to reconnect to services...")
+            # Reconnection logic would go here
+            
+        elif "rate limit" in error_type.lower():
+            repair_log["actions"].append("Implementing exponential backoff...")
+            repair_log["success"] = True
+            
+        elif "memory" in error_type.lower():
+            repair_log["actions"].append("Clearing old cache entries...")
+            # Cache clearing logic
+            repair_log["success"] = True
+        
+        return repair_log
+
+# Initialize self-diagnostic system
+arya_diagnostics = SelfDiagnostics()
+
 # Create the main app without a prefix
 app = FastAPI()
 

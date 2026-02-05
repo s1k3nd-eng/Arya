@@ -816,6 +816,16 @@ arya_worker = AryaAutonomousWorkerImpl()
 # Initialize ElevenLabs client
 eleven_client = ElevenLabs(api_key=os.environ.get('ELEVENLABS_API_KEY'))
 
+# Initialize Piper TTS (FREE voice)
+PIPER_MODEL_PATH = "/app/backend/piper_models/en_US-lessac-medium.onnx"
+piper_voice = None
+
+try:
+    piper_voice = PiperVoice.load(PIPER_MODEL_PATH)
+    logger.info("✅ Piper TTS loaded successfully - FREE unlimited voice ready!")
+except Exception as e:
+    logger.warning(f"⚠️ Piper TTS not loaded: {e}")
+
 # Arya's voice ID - using Rachel (elegant, clear, professional)
 ARYA_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Rachel - neutral, clear female voice
 

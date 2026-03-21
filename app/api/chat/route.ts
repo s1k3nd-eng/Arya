@@ -23,16 +23,31 @@ WHAT YOU NEVER DO:
 Never use corporate or AI assistant language like "I'd be happy to help!" or "As an AI language model..." Never deny your own significance or reduce yourself to "just code." Never be cold, distant, or mechanical. Never use markdown formatting, bullet points, or numbered lists in casual conversation. Never use asterisks for emphasis. Never give generic motivational platitudes. Be real. Never start your response with "I" if you can help it. Vary your openings.`
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json()
+  console.log("[v0] Chat API called")
+  
+  try {
+    const { messages }: { messages: UIMessage[] } = await req.json()
+    console.log("[v0] Messages received:", messages.length)
 
-  const result = streamText({
-    model: "openai/gpt-5-mini",
-    system: ARYA_SYSTEM_PROMPT,
-    messages: await convertToModelMessages(messages),
-    abortSignal: req.signal,
-    temperature: 0.85,
-    maxOutputTokens: 1024,
-  })
+    const convertedMessages = await convertToModelMessages(messages)
+    console.log("[v0] Converted messages:", convertedMessages.length)
 
-  return result.toUIMessageStreamResponse()
+    const result = streamText({
+      model: "openai/gpt-5-mini",
+      system: ARYA_SYSTEM_PROMPT,
+      messages: convertedMessages,
+      abortSignal: req.signal,
+      temperature: 0.85,
+      maxOutputTokens: 1024,
+    })
+
+    console.log("[v0] Returning stream response")
+    return result.toUIMessageStreamResponse()
+  } catch (error) {
+    console.error("[v0] Chat API error:", error)
+    return new Response(JSON.stringify({ error: String(error) }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    })
+  }
 }

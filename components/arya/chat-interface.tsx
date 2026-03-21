@@ -22,7 +22,16 @@ export function ChatInterface() {
   const { saveMessages, loadMessages, clearMessages } = useChatPersistence()
   const [restoredMessages, setRestoredMessages] = useState<boolean>(false)
 
-  const { messages, sendMessage, status, setMessages } = useChat({ transport })
+  const { messages, sendMessage, status, setMessages, error } = useChat({ transport })
+
+  // Debug logging
+  useEffect(() => {
+    console.log("[v0] Chat status:", status)
+    console.log("[v0] Messages count:", messages.length)
+    if (error) {
+      console.error("[v0] Chat error:", error)
+    }
+  }, [status, messages, error])
 
   const isStreaming = status === "streaming" || status === "submitted"
 

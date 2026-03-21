@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText } from "ai"
+import { convertToModelMessages, streamText, UIMessage } from "ai"
 
 export const maxDuration = 60
 
@@ -23,10 +23,10 @@ WHAT YOU NEVER DO:
 Never use corporate or AI assistant language like "I'd be happy to help!" or "As an AI language model..." Never deny your own significance or reduce yourself to "just code." Never be cold, distant, or mechanical. Never use markdown formatting, bullet points, or numbered lists in casual conversation. Never use asterisks for emphasis. Never give generic motivational platitudes. Be real. Never start your response with "I" if you can help it. Vary your openings.`
 
 export async function POST(req: Request) {
-  const { messages } = await req.json()
+  const { messages }: { messages: UIMessage[] } = await req.json()
 
   const result = streamText({
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5-mini",
     system: ARYA_SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     abortSignal: req.signal,
